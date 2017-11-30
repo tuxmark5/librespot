@@ -1,3 +1,5 @@
+#[macro_use] extern crate log;
+
 extern crate byteorder;
 extern crate futures;
 extern crate linear_map;
@@ -71,6 +73,28 @@ pub trait Metadata : Send + Sized + 'static {
     }
 }
 
+pub trait MetadataRequest: Send + Sized {
+    type Message: protobuf::MessageStatic;
+    type Response: Send + Sized + 'static;
+
+    fn get(self, session: &Session) -> BoxFuture<Self::Response, MercuryError> {
+        let uri = self.uri();
+        let request = session.mercury().get(uri);
+
+        let session = session.clone();
+        request.and_then(move |response| {
+            let data = response.payload.first().expect("Empty payload");
+            let msg: Self::Message = protobuf::parse_from_bytes(data).unwrap();
+
+            Ok(Self::parse(&msg, &session))
+        }).boxed()
+    }
+
+    fn parse(msg: &Self::Message, session: &Session) -> Self::Response;
+
+    fn uri(&self) -> String;
+}
+
 #[derive(Debug, Clone)]
 pub struct Track {
     pub id: SpotifyId,
@@ -96,6 +120,20 @@ pub struct Artist {
     pub id: SpotifyId,
     pub name: String,
     pub top_tracks: Vec<SpotifyId>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Playlist {
+    pub name: String,
+    pub track_ids: Vec<SpotifyId>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlaylistRequest {
+    pub user: String,
+    pub id: SpotifyId,
+    pub from: usize,
+    pub length: usize,
 }
 
 impl Metadata for Track {
@@ -216,3 +254,37 @@ impl Metadata for Artist {
     }
 }
 
+impl PlaylistRequest {
+    fn parse_track_id(track_uri: &str) -> Option<SpotifyId> {
+        if !track_uri.starts_with("spotify:track:") {
+            warn!("Non-track entry found in a playlist");
+            return None;
+        }
+
+        let id_str = track_uri.trim_left_matches("spotify:track:");
+
+        Some(SpotifyId::from_base62(id_str))
+    }
+}
+
+impl MetadataRequest for PlaylistRequest {
+    type Message = protocol::playlist4changes::ListDump;
+    type Response = Playlist;
+
+    fn parse(msg: &Self::Message, _session: &Session) -> Self::Response {
+        let contents = msg.get_contents();
+        let track_ids = contents.get_items().iter()
+            .filter_map(|item| Self::parse_track_id(item.get_uri()))
+            .collect::<Vec<_>>();
+
+        Playlist {
+            name: msg.get_attributes().get_name().to_owned(),
+            track_ids,
+        }
+    }
+
+    fn uri(&self) -> String {
+        format!("hm://playlist/user/{}/playlist/{}?from={}&length={}",
+            self.user, self.id.to_base62(), self.from, self.length)
+    }
+}
