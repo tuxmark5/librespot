@@ -1,3 +1,5 @@
+#![feature(i128_type)]
+
 #![cfg_attr(feature = "cargo-clippy", allow(unused_io_amount))]
 
 // TODO: many items from tokio-core::io have been deprecated in favour of tokio-io

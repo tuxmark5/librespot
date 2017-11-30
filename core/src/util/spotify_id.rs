@@ -1,6 +1,5 @@
 use std;
 use std::fmt;
-use util::u128;
 use byteorder::{BigEndian, ByteOrder};
 use std::ascii::AsciiExt;
 
@@ -16,11 +15,11 @@ impl SpotifyId {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
-        let mut n: u128 = u128::zero();
+        let mut n: u128 = 0;
         for c in data {
             let d = BASE16_DIGITS.iter().position(|e| e == c).unwrap() as u8;
-            n = n * u128::from(16);
-            n = n + u128::from(d);
+            n = n * (16 as u128);
+            n = n + (d as u128);
         }
 
         SpotifyId(n)
@@ -30,11 +29,11 @@ impl SpotifyId {
         assert!(id.is_ascii());
         let data = id.as_bytes();
 
-        let mut n: u128 = u128::zero();
+        let mut n: u128 = 0;
         for c in data {
             let d = BASE62_DIGITS.iter().position(|e| e == c).unwrap() as u8;
-            n = n * u128::from(62);
-            n = n + u128::from(d);
+            n = n * (62 as u128);
+            n = n + (d as u128);
         }
 
         SpotifyId(n)
@@ -43,35 +42,39 @@ impl SpotifyId {
     pub fn from_raw(data: &[u8]) -> SpotifyId {
         assert_eq!(data.len(), 16);
 
-        let high = BigEndian::read_u64(&data[0..8]);
-        let low = BigEndian::read_u64(&data[8..16]);
+        let n = BigEndian::read_uint128(data, 16);
 
-        SpotifyId(u128::from_parts(high, low))
+        SpotifyId(n)
     }
 
     pub fn to_base16(&self) -> String {
         let &SpotifyId(ref n) = self;
-        let (high, low) = n.parts();
 
         let mut data = [0u8; 32];
-        for i in 0..16 {
-            data[31 - i] = BASE16_DIGITS[(low.wrapping_shr(4 * i as u32) & 0xF) as usize];
+        for i in 0..32 {
+            data[31 - i] = BASE16_DIGITS[(n.wrapping_shr(4 * i as u32) & 0xF) as usize];
         }
-        for i in 0..16 {
-            data[15 - i] = BASE16_DIGITS[(high.wrapping_shr(4 * i as u32) & 0xF) as usize];
+
+        std::str::from_utf8(&data).unwrap().to_owned()
+    }
+
+    pub fn to_base62(&self) -> String {
+        let mut id = self.0;
+        let mut data = [0u8; 22];
+
+        for i in 0..22 {
+            let digit = id % (62 as u128);
+            data[21 - i] = BASE62_DIGITS[digit as usize];
+            id = id / (62 as u128);
         }
 
         std::str::from_utf8(&data).unwrap().to_owned()
     }
 
     pub fn to_raw(&self) -> [u8; 16] {
-        let &SpotifyId(ref n) = self;
-        let (high, low) = n.parts();
-
         let mut data = [0u8; 16];
 
-        BigEndian::write_u64(&mut data[0..8], high);
-        BigEndian::write_u64(&mut data[8..16], low);
+        BigEndian::write_u128(&mut data[0..16], self.0);
 
         data
     }

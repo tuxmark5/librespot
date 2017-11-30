@@ -10,11 +10,9 @@ use std::path::Path;
 use std::process::Command;
 use std::time::{UNIX_EPOCH, SystemTime};
 
-mod int128;
 mod spotify_id;
 mod subfile;
 
-pub use util::int128::u128;
 pub use util::spotify_id::{SpotifyId, FileId};
 pub use util::subfile::Subfile;
 

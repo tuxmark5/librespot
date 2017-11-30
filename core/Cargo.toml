@@ -9,7 +9,6 @@ path = "../protocol"
 
 [dependencies]
 base64 = "0.5.0"
-byteorder = "1.0"
 error-chain = { version = "0.9.0", default_features = false }
 futures = "0.1.8"
 hyper = "0.11.2"
@@ -28,6 +27,11 @@ serde_json = "0.9.5"
 shannon = "0.2.0"
 tokio-core = "0.1.2"
 uuid = { version = "0.4", features = ["v4"] }
+
+[dependencies.byteorder]
+default-features = false
+features = ["i128"]
+version = "1.0"
 
 [build-dependencies]
 protobuf_macros = { git = "https://github.com/plietar/rust-protobuf-macros", features = ["with-syntex"] }
